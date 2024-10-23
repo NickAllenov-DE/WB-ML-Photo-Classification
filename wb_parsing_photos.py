@@ -187,7 +187,7 @@ def main():
     # Открытие CSV-файла в режиме записи
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         csv_writer = csv.writer(file, delimiter=';')
-        csv_writer.writerow(['Индекс', 'URL карточки товара', 'URL фотографии', 'Путь к фото на компьютере'])  # Заголовки
+        csv_writer.writerow(['Индекс', 'URL карточки товара', 'URL фотографии', 'Локальный путь к фото'])  # Заголовки
 
         existing_images = set()  # Множество для хранения уникальных URL изображений
 
