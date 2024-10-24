@@ -119,7 +119,7 @@ def get_product_links(driver, start_page):
     product_links = []
     page_number = 1
 
-    while page_number < 2:  # Замените 2 на нужное количество страниц
+    while True:  # Можно заменить "True" на "page_number < 2" и "< 2" на нужное количество страниц
         logging.info(f"Собираем ссылки со страницы {page_number}")
         driver.get(f"{start_page}?page={page_number}")
         time.sleep(random.uniform(1.5, 3.5))  # Увеличьте время ожидания
@@ -200,7 +200,7 @@ async def async_get_feedback_images(driver, product_card_url, save_directory, cs
 
         # ВНИМАНИЕ!!! ОСТОРОЖНО!!!
         # Эта функция для прокрутки всплывающего окна с фото, если нужны все 3 МИЛЛИОНА фото
-        scroll_popup_to_bottom(driver, popup_element)
+        # scroll_popup_to_bottom(driver, popup_element)
 
         images = popup_element.find_elements(By.XPATH, './/li/img')
         logging.info(f"Найдено {len(images)} фото для товара: {product_card_url}")
