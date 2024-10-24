@@ -45,8 +45,8 @@ def scroll_page_to_bottom(driver):
         last_height = new_height
 
 
+# Функция для прокрутки всплывающего окна с фотографиями
 def scroll_popup_to_bottom(driver, popup_element, scroll_pause_time=1):
-    """ Функция для прокрутки всплывающего окна с фотографиями """
     last_height = driver.execute_script("return arguments[0].scrollHeight", popup_element)
     
     while True:

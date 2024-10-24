@@ -24,7 +24,7 @@ sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 
 # Настройка логирования
-logging.basicConfig(filename="parser.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(filename="async-parser.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", encoding="utf-8")
 
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36"
@@ -104,7 +104,11 @@ async def async_download_image(session, img_url, save_directory, img_name):
                 img_path = os.path.join(save_directory, img_name)
                 with open(img_path, 'wb') as img_file:
                     img_file.write(img_data)
+                logging.info(f"Изображение успешно сохранено: {img_path}")
                 return img_path
+            else:
+                logging.error(f"Не удалось загрузить изображение. Статус: {response.status}")
+                return None
     except Exception as e:
         logging.error(f"Ошибка при сохранении изображения: {e}")
         return None
@@ -115,50 +119,95 @@ def get_product_links(driver, start_page):
     product_links = []
     page_number = 1
 
-    while True:
+    while page_number < 2:  # Замените 2 на нужное количество страниц
         logging.info(f"Собираем ссылки со страницы {page_number}")
         driver.get(f"{start_page}?page={page_number}")
-        time.sleep(random.uniform(1.5, 3.5))  
+        time.sleep(random.uniform(1.5, 3.5))  # Увеличьте время ожидания
         scroll_page_to_bottom(driver)
         
         products = driver.find_elements(By.XPATH, '//article/div/a')
         for product in products:
-            product_links.append(product.get_attribute("href"))
+            link = product.get_attribute("href")
+            if link not in product_links:
+                product_links.append(link)
 
         next_button = get_next_page_button(driver)
         if next_button:
             next_button.click()  # Переходим на следующую страницу
-            time.sleep(random.uniform(1.5, 3.5))
+            time.sleep(random.uniform(1.5, 3.5))  # Увеличьте время ожидания
             page_number += 1
         else:
             break
     return product_links
 
 
-# Асинхронный сбор фотографий с отзывов
+
+def scroll_into_view(driver, element):
+    driver.execute_script("arguments[0].scrollIntoView(true);", element)
+    time.sleep(1)  # Добавляем небольшую задержку, чтобы страница стабилизировалась
+
+
+
+def wait_for_element_to_be_clickable(driver, xpath, timeout=10):
+    try:
+        element = WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((By.XPATH, xpath))
+        )
+        return element
+    except Exception as e:
+        logging.error(f"Элемент не кликабелен: {xpath}, ошибка: {e}")
+        return None
+
+
+def click_element_js(driver, element):
+    driver.execute_script("arguments[0].click();", element)
+
+
 async def async_get_feedback_images(driver, product_card_url, save_directory, csv_writer, index, existing_images):
     if is_url_accessible(product_card_url):
         driver.get(product_card_url)
         await asyncio.sleep(random.uniform(1.5, 3.5))
+
         scroll_page_incrementally(driver, 0.1)
-        await asyncio.sleep(1)
+        await asyncio.sleep(1.5)
 
         try:
+            # Ожидание и прокрутка до кнопки
             show_all_photos_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@class="comments__user-opinion-right hide-mobile"]/button'))
+            EC.element_to_be_clickable((By.XPATH, '//*[@class="comments__user-opinion-right hide-mobile"]/button'))
             )
-            show_all_photos_button.click()
-            await asyncio.sleep(random.uniform(1.5, 3.5))
+            
+            # show_all_photos_button = wait_for_element_to_be_clickable(driver, '//*[@class="comments__user-opinion-right hide-mobile"]/button')
+            
+            if show_all_photos_button:
+                show_all_photos_button.click()  # Пытаемся нажать на кнопку
+
+                # scroll_into_view(driver, show_all_photos_button)  # Прокрутить поле видимости дна кнопку
+                click_element_js(driver, show_all_photos_button)  # Принудительное нажатие кнопки через скрипт js
+
+                await asyncio.sleep(random.uniform(2, 3.5))
+            else:
+                logging.error(f"Кнопка 'Смотреть все фото и видео' не найдена для товара: {product_card_url}")
+                return
         except Exception as e:
-            logging.error(f"Кнопка 'Смотреть все фото и видео' не найдена для товара: {product_card_url}, ошибка: {e}")
+            logging.error(f"Ошибка при клике по кнопке для товара: {product_card_url}, ошибка: {e}")
             return
 
+        # Далее код для обработки всплывающего окна с фото
         popup_element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div'))
         )
-        
+
+        # ВНИМАНИЕ!!! ОСТОРОЖНО!!!
+        # Эта функция для прокрутки всплывающего окна с фото, если нужны все 3 МИЛЛИОНА фото
+        scroll_popup_to_bottom(driver, popup_element)
+
         images = popup_element.find_elements(By.XPATH, './/li/img')
         logging.info(f"Найдено {len(images)} фото для товара: {product_card_url}")
+
+        # Создание директории для сохранения изображений, если её ещё нет
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
 
         async with aiohttp.ClientSession() as session:
             tasks = []
@@ -182,8 +231,8 @@ async def async_get_feedback_images(driver, product_card_url, save_directory, cs
 # Основная асинхронная функция
 async def main():
     driver = setup_driver()
-    csv_file = "feedback_images.csv"
-    dir_to_save = os.path.join(os.getcwd(), "wb-diapers-photos")
+    csv_file = "feedback_images_async.csv"
+    dir_to_save = os.path.join(os.getcwd(), "wb-diapers-photos-async")
 
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         csv_writer = csv.writer(file, delimiter=';')
