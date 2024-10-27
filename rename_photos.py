@@ -1,6 +1,7 @@
 
 # Импорт библиотек
 import os
+import pandas as pd
 
 def rename_photos(directory):
     
@@ -28,8 +29,26 @@ def rename_photos(directory):
                 id_counter += 1  # Увеличиваем счетчик
 
 
-def undo_rename(directory):
-    log_file = os.path.join(directory, "renaming_log.txt")
+def update_csv_from_log(csv_file, log_file):
+    """Функция для обновления CSV на основе логов переименования."""
+    
+    # Чтение данных из CSV
+    df = pd.read_csv(csv_file)
+
+    # Чтение логов и обновление путей в DataFrame
+    with open(log_file, "r") as log:
+        for line in log:
+            old_path, new_path = line.strip().split(',')
+            # Обновление пути в столбце 'local_path'
+            df.loc[df['local_path'] == old_path, 'local_path'] = new_path
+
+    # Сохранение изменений в CSV
+    df.to_csv(csv_file, index=False)
+    print(f"CSV файл '{csv_file}' обновлен на основе логов.")
+
+
+def undo_rename(log_file_path):
+    log_file = log_file_path
     if not os.path.exists(log_file):
         print("Лог-файл не найден, отмена невозможна.")
         return
@@ -47,9 +66,14 @@ def undo_rename(directory):
 
 if __name__ == '__main__':
     directory_path = 'D:/Projects/Curent Projects/wb-diapers-photos'
+    log_file_path = os.path.join(directory_path, "WB-ML-Photo-Classification/renaming_log.txt")
+    csv_file_path = 'D:/Projects/Curent Projects/WB-ML-Photo-Classification/feedback_images.csv'
     
-    # Переименование файлов
+    # Переименовываем файлы и создаем лог
     rename_photos(directory_path)
+    
+    # Обновляем CSV файл на основе логов
+    update_csv_from_log(csv_file_path, log_file_path)
 
     # Отмена переименования
     # undo_rename(directory_path)

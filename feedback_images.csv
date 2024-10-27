@@ -1,4 +1,4 @@
-Индекс;URL карточки товара;URL фотографии;Локальный путь к фото
+index;product_url;photo_url;local_path
 1_1;https://www.wildberries.ru/catalog/205506590/detail.aspx;https://videofeedback03.wbbasket.ru/1e2db231-c93e-4739-b21d-a24dc214d02f/preview.webp;d:\Projects\Curent Projects\WB-ML-Photo-Classification\wb-diapers-photos\product_1_1.jpg
 1_2;https://www.wildberries.ru/catalog/205506590/detail.aspx;https://feedback06.wbbasket.ru/vol2228/part222817/222817965/photos/fs.webp;d:\Projects\Curent Projects\WB-ML-Photo-Classification\wb-diapers-photos\product_1_2.jpg
 1_3;https://www.wildberries.ru/catalog/205506590/detail.aspx;https://videofeedback04.wbbasket.ru/9833969e-7753-4926-89b4-a7f85c3e433b/preview.webp;d:\Projects\Curent Projects\WB-ML-Photo-Classification\wb-diapers-photos\product_1_3.jpg

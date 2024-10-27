@@ -231,7 +231,7 @@ def main():
 
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         csv_writer = csv.writer(file, delimiter=';')  # Создание CSV-писателя
-        csv_writer.writerow(['Индекс', 'URL карточки товара', 'URL фотографии', 'Локальный путь к фото'])  # Заголовки столбцов
+        csv_writer.writerow(['index', 'product_url', 'photo_url', 'local_path'])  # Заголовки столбцов
         existing_images = set()  # Множество для хранения существующих изображений
 
         try:
