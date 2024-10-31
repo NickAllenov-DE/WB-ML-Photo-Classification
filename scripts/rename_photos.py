@@ -66,9 +66,6 @@ def update_csv_from_log(csv_file, log_file_path):
     print(f"CSV файл '{csv_file}' обновлен на основе логов.")
 
 
-
-
-
 def undo_rename(log_file_path):
     """Функция для отмены переименования на основе логов."""
     
@@ -89,9 +86,9 @@ def undo_rename(log_file_path):
 
 
 if __name__ == '__main__':
-    directory_path = 'D:/Projects/CurrentProjects/WB-ML-Photo-Classification/wb-diapers-photos'
-    csv_file_path = 'D:/Projects/CurrentProjects/WB-ML-Photo-Classification/feedback_images.csv'
-    log_file_path = 'D:/Projects/CurrentProjects/WB-ML-Photo-Classification/renaming_log.txt'
+    directory_path = r'D:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\raw\wb-diapers-photos'
+    csv_file_path = r'D:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\processed\feedback_images.csv'
+    log_file_path = r'D:\Projects\CurrentProjects\WB-ML-Photo-Classification\logs\renaming_log.txt'
     
     # Переименовываем файлы и создаем лог
     rename_photos(directory_path, log_file_path)

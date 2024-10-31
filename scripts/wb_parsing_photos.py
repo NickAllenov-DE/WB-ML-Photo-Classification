@@ -226,8 +226,8 @@ def main():
     """Основная функция для запуска процесса парсинга."""
     logging.info("Запуск основного процесса.")
     driver = setup_driver()  # Настройка веб-драйвера
-    csv_file = "feedback_images.csv"  # Имя CSV-файла для сохранения данных
-    dir_to_save = os.path.join(os.getcwd(), "wb-diapers-photos")  # Директория для сохранения изображений
+    csv_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\processed\feedback_images.csv"  # Имя CSV-файла для сохранения данных
+    dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\raw\wb-diapers-photos"  # Директория для сохранения изображений
 
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         csv_writer = csv.writer(file, delimiter=',')  # Создание CSV-писателя
