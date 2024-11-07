@@ -15,6 +15,9 @@ import random  # Для генерации случайных чисел
 import csv  # Для работы с CSV-файлами
 import logging  # Для ведения логов
 
+
+TIMEOUT = (0.5, 2.0)
+
 # Обработка кодировки для вывода в консоль
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
@@ -28,7 +31,7 @@ logging.basicConfig(
     level=logging.INFO,  # Уровень логирования
     format='%(asctime)s - %(levelname)s - %(message)s',  # Формат сообщений
     handlers=[
-        logging.FileHandler("wb-parser.log"),  # Логирование в файл
+        logging.FileHandler("logs/wb_images_parser.log"),  # Логирование в файл
         logging.StreamHandler()  # Логирование в консоль
     ],
     encoding="utf-8"  # Кодировка логов
@@ -67,7 +70,7 @@ def scroll_page_to_bottom(driver):
     
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Прокрутка вниз
-        time.sleep(random.uniform(1.5, 3.5))  # Ожидание перед следующей прокруткой
+        time.sleep(random.uniform(*TIMEOUT))  # Ожидание перед следующей прокруткой
         new_height = driver.execute_script("return document.body.scrollHeight")  # Получаем новую высоту
         if new_height == last_height:  # Если высота не изменилась, значит, достигли конца
             logging.info("Достигнут конец страницы.")
@@ -128,7 +131,7 @@ def get_product_links(driver, start_page):
 
         logging.info(f"Собираем ссылки на карточки товаров с страницы {page_number}.")
         driver.get(current_page_url)  # Переход на страницу
-        time.sleep(random.uniform(1.5, 3.5))  # Ожидание загрузки страницы
+        time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки страницы
         scroll_page_to_bottom(driver)  # Прокрутка страницы до конца
         
         products = driver.find_elements(By.XPATH, '//article/div/a')  # Поиск элементов с товарами
@@ -140,7 +143,7 @@ def get_product_links(driver, start_page):
         next_button = get_next_page_button(driver)  # Получение кнопки "Следующая страница"
         if next_button:
             next_button.click()  # Переход на следующую страницу
-            time.sleep(random.uniform(1.5, 3.5))  # Ожидание загрузки следующей страницы
+            time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки следующей страницы
             page_number += 1  # Увеличение номера страницы
         else:
             logging.info("Последняя страница достигнута.")
@@ -179,7 +182,7 @@ def get_feedback_images(driver, product_card_url, save_directory, csv_writer, in
         return  # Выход из функции, если URL недоступен
     
     driver.get(product_card_url)  # Переход на страницу товара
-    time.sleep(random.uniform(1.5, 3.5))  # Ожидание загрузки страницы
+    time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки страницы
 
     scroll_page_incrementally(driver, 0.1)  # Инкрементальная прокрутка страницы
     time.sleep(1)  # Дополнительное ожидание
@@ -189,7 +192,7 @@ def get_feedback_images(driver, product_card_url, save_directory, csv_writer, in
             EC.element_to_be_clickable((By.XPATH, '//*[@class="comments__user-opinion-right hide-mobile"]/button'))
         )
         show_all_photos_button.click()  # Клик по кнопке "Смотреть все фото"
-        time.sleep(random.uniform(1.5, 3.5))  # Ожидание загрузки изображений
+        time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки изображений
     except Exception as e:
         logging.warning(f"Кнопка 'Смотреть все фото' не найдена для {product_card_url}: {e}")
         return  # Выход из функции, если кнопка не найдена
