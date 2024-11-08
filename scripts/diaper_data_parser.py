@@ -244,6 +244,106 @@ def get_product_data(driver, product_url):
     return product_data
 
 
+def get_reviews(driver, product_url, max_reviews=100):
+    """Собирает отзывы из карточки товара, включая имя автора, дату, оценку и текст, ограничивая сбор числом max_reviews."""
+    # Переход на страницу товара
+    driver.get(product_url)
+    time.sleep(random.uniform(*TIMEOUT))
+    
+    scroll_page_incrementally(driver, 0.2)
+    time.sleep(0.42)
+
+    # Переход к разделу отзывов
+    try:
+        # Кнопка для открытия раздела отзывов, если требуется
+        reviews_button = driver.find_element(By.XPATH, '//a[contains(@class, "comments__btn-all") and @data-see-all="true"]')
+        reviews_button.click()
+        time.sleep(random.uniform(*TIMEOUT))
+    except Exception as e:
+        logging.warning(f"Не удалось открыть раздел отзывов для товара: {e}")
+        return []
+    
+    # Прокрутка раздела отзывов до конца для загрузки всех данных
+    scroll_page_to_bottom(driver)
+
+    # Сбор данных по каждому отзыву
+    reviews_data = []
+    try:
+        reviews = driver.find_elements(By.XPATH, '//ul[@class="comments__list"]/li')
+
+        for review in reviews:
+            # Проверка, достигнуто ли максимальное количество отзывов
+            if len(reviews_data) >= max_reviews:
+                break
+            
+            # Инициализируем данные для каждого отзыва
+            review_data = {}
+
+            # Получение имени пользователя (обычный или премиум)
+            try:
+                try:
+                    author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text  # Обычный пользователь
+                except:
+                    author_name = review.find_element(By.XPATH, './/div/div[2]/div/div/p').text  # Премиум пользователь
+                review_data["Author Name"] = author_name
+            except Exception as e:
+                logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
+                review_data["Author Name"] = None
+            
+            # Получение даты и рейтинга
+            try:
+                date = review.find_element(By.XPATH, './/div/div[2]/div[2]/span').text
+                rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
+                rating_class = rating_element.get_attribute("class")
+                
+                # Извлечение числового значения рейтинга
+                rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
+                
+                review_data["Date"] = date
+                review_data["Rating"] = rating
+            except Exception as e:
+                logging.warning(f"Ошибка при извлечении даты или рейтинга: {e}")
+                review_data["Date"] = None
+                review_data["Rating"] = None
+
+            # Сбор текста отзыва
+            try:
+                full_text = ""
+                
+                # Достоинства
+                pros_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-pro"]')
+                if pros_element:
+                    pros_text = pros_element[0].text
+                    full_text += f"Достоинства: {pros_text}\n"
+                
+                # Недостатки
+                cons_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-con"]')
+                if cons_element:
+                    cons_text = cons_element[0].text
+                    full_text += f"Недостатки: {cons_text}\n"
+                
+                # Комментарии
+                comments_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item"]')
+                if comments_element:
+                    comments_text = comments_element[0].text
+                    full_text += f"Комментарии: {comments_text}"
+                
+                review_data["Text"] = full_text.strip()
+                
+            except Exception as e:
+                logging.warning(f"Ошибка при сборе текста отзыва: {e}")
+                review_data["Text"] = None
+            
+            reviews_data.append(review_data)
+    
+    except Exception as e:
+        logging.error(f"Ошибка при извлечении отзывов: {e}")
+    
+    logging.info(f"Собрано {len(reviews_data)} отзывов для товара.")
+    return reviews_data
+
+
+
 
 
 
