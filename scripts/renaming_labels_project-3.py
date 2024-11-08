@@ -19,3 +19,6 @@ df['choice'] = df['choice'].replace(label_mapping)
 df.to_csv(csv_path, index=False)
 
 print("Метки успешно обновлены в CSV-файле.")
+
+
+# TODO: "ДОБАВИТЬ ЦИФРОВЫЕ МЕТКИ КЛАССОВ: 1, 2, 3"

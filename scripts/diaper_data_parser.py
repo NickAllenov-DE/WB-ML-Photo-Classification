@@ -156,7 +156,7 @@ def get_product_links(driver, start_page):
 def get_price(driver):
     """Извлекает и форматирует цену товара."""
     try:
-        price_element = driver.find_element(By.XPATH, '//ins[@class="price-block__final-price wallet"]')
+        price_element = driver.find_element(By.XPATH, '//*[@id="b88bf175-c0d2-fec2-0220-3447970e41fa"]/div[3]/div[2]/div/div/div/div/p/span/ins')
         price_text = price_element.text  # Например, "1 234 ₽"
         price = int(price_text.replace("\u00A0", "").replace("₽", "").strip())  # Убираем пробелы и знак рубля
         return price
@@ -171,7 +171,7 @@ def get_full_description_button(driver):
         button = driver.find_element(By.XPATH, '//button[contains(text(), "Все характеристики и описание")]')
         button.click()
         logging.info("Кнопка 'Все характеристики и описание' найдена и нажата.")
-        time.sleep(random.uniform(1.5, 3.5))  # Ожидание открытия всплывающего окна
+        time.sleep(random.uniform(*TIMEOUT))  # Ожидание открытия всплывающего окна
     except Exception as e:
         logging.error(f"Не удалось найти или нажать кнопку 'Все характеристики и описание': {e}")
 
@@ -180,16 +180,24 @@ def get_popup_data(driver):
     """Извлекает данные из всплывающего окна после его открытия."""
     try:
         # Подождем загрузку окна
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//div[@class="popup-class"]')))
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div')))
         
-        # Здесь находим каждый элемент внутри окна по его XPATH и извлекаем данные
-        color = driver.find_element(By.XPATH, '//*[@data-test="color"]').text
-        product_type = driver.find_element(By.XPATH, '//*[@data-test="product-type"]').text
-        number_units = driver.find_element(By.XPATH, '//*[@data-test="number-units"]').text
-        weight_category = driver.find_element(By.XPATH, '//*[@data-test="weight-category"]').text
-        producing_country = driver.find_element(By.XPATH, '//*[@data-test="producing-country"]').text
-        overall_size = driver.find_element(By.XPATH, '//*[@data-test="overall-size"]').text
-        description = driver.find_element(By.XPATH, '//*[@data-test="description"]').text
+        # Находим каждый элемент внутри окна по его XPATH и извлекаем данные
+        color = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[1]/tbody/tr/td/span').text
+        product_type = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[1]/td/span').text
+        number_units = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[2]/tbody/tr/td/span').text
+        weight_category = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[2]/td/span').text
+        producing_country = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[4]/td/span').text
+
+        # Извлечение размеров упаковки
+        length = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[1]/td/span').text.strip().replace(' см', '')
+        height = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[2]/td/span').text.strip().replace(' см', '')
+        width = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[3]/td/span').text.strip().replace(' см', '')
+        
+        # Форматируем габариты
+        overall_size = f"{width}x{height}x{length}"
+
+        description = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/section/p').text
 
         popup_data = {
             "Цвет": color,
@@ -204,6 +212,7 @@ def get_popup_data(driver):
     except Exception as e:
         logging.error(f"Ошибка при извлечении данных из всплывающего окна: {e}")
         return None
+
 
 def get_product_data(driver, product_url):
     """Извлекает всю информацию о товаре, включая данные из всплывающего окна."""
