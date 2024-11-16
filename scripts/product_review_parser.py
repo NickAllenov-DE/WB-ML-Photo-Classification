@@ -31,12 +31,11 @@ logging.basicConfig(
     level=logging.INFO,  # Уровень логирования
     format='%(asctime)s - %(levelname)s - %(message)s',  # Формат сообщений
     handlers=[
-        logging.FileHandler("logs/wb_data_parser.log"),  # Логирование в файл
+        logging.FileHandler("logs/wb_images_parser.log"),  # Логирование в файл
         logging.StreamHandler()  # Логирование в консоль
     ],
     encoding="utf-8"  # Кодировка логов
 )
-
 
 def setup_driver():
     """Настраивает и возвращает экземпляр Selenium WebDriver с заданными параметрами."""
@@ -346,13 +345,24 @@ def get_reviews(driver, product_url, max_reviews=100):
 
 
 
-
-
-
-
 def main():
-    pass
+    """Основная функция для запуска процесса парсинга."""
+    logging.info("Запуск основного процесса.")
+    driver = setup_driver()  # Настройка веб-драйвера
+    csv_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\processed\feedback_images.csv"  # Имя CSV-файла для сохранения данных
+    dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\raw\wb-diapers-photos"  # Директория для сохранения изображений
 
+    with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
+        csv_writer = csv.writer(file, delimiter=',')  # Создание CSV-писателя
+        csv_writer.writerow(['index', 'product_url', 'photo_url', 'local_path'])  # Заголовки столбцов
+        existing_images = set()  # Множество для хранения существующих изображений
 
-if __name__ == "__main__":
-    main()  # Запуск основной функции
+        try:
+            product_cards_list = get_product_links(driver, start_page_url)  # Получение ссылок на карточки товаров
+            for index, product_card in enumerate(product_cards_list):
+                get_feedback_images(driver, product_card, dir_to_save, csv_writer, index, existing_images)  # Скачивание изображений для каждого товара
+        except Exception as e:
+            logging.error(f"Ошибка в основном процессе: {e}")
+        finally:
+            driver.quit()  # Закрытие драйвера
+            logging.info("Процесс завершен.")

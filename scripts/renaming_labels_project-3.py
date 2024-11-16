@@ -9,7 +9,6 @@ label_mapping = {
     "Real Child": "real_child",
     "Illustration of Child": "illustrated_child",
     "No Child Present": "no_child_present",
-    "Both Present": "both_present"
 }
 
 # Замена старых меток на новые
