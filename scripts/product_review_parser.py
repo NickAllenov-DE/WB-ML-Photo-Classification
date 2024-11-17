@@ -11,12 +11,14 @@ from webdriver_manager.chrome import ChromeDriverManager  # Для автома�
 from selenium.webdriver.support.ui import WebDriverWait  # Для ожидания загрузки элементов
 from selenium.webdriver.support import expected_conditions as EC  # Для условий ожидания
 import time  # Для работы с временем
+from datetime import datetime, timedelta
 import random  # Для генерации случайных чисел
 import csv  # Для работы с CSV-файлами
 import logging  # Для ведения логов
+from tqdm import tqdm
 
 
-TIMEOUT = (0.5, 2.0)
+TIMEOUT = (0.25, 1.75)
 
 # Обработка кодировки для вывода в консоль
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
@@ -230,9 +232,9 @@ def get_product_data(driver, product_url):
     
     # Объединяем данные
     product_data = {
-        "Артикул продукта": product_id,
+        "Артикул": product_id,
         "Бренд": brand,
-        "Название продукта": name,
+        "Название": name,
         "Цена": price
     }
     
@@ -243,105 +245,178 @@ def get_product_data(driver, product_url):
     return product_data
 
 
-def get_reviews(driver, product_url, max_reviews=100):
-    """Собирает отзывы из карточки товара, включая имя автора, дату, оценку и текст, ограничивая сбор числом max_reviews."""
-    # Переход на страницу товара
-    driver.get(product_url)
-    time.sleep(random.uniform(*TIMEOUT))
+def extract_date_time(date_element):
+    """
+    Извлекает дату и время из HTML-элемента и приводит их к нормальному формату.
     
+    Args: date_element: WebElement содержащий атрибут 'content' с датой и временем.
+    Returns: tuple: (строка с датой, строка с временем в формате HH:MM:SS, строка с часовым поясом)
+    """
+    try:
+        # Извлекаем ISO-строку
+        date_time_iso = date_element.get_attribute("content").rstrip("Z")
+        
+        # Преобразуем ISO в объект datetime
+        date_time_obj = datetime.strptime(date_time_iso, "%Y-%m-%dT%H:%M:%S")
+        
+        # Добавляем 3 часа (часовой пояс Москвы)
+        date_time_obj_with_tz = date_time_obj + timedelta(hours=3)
+        
+        # Извлекаем дату и время в нужных форматах
+        date_str = date_time_obj_with_tz.strftime("%Y-%m-%d")
+        time_str = date_time_obj_with_tz.strftime("%H:%M:%S")
+        timezone_str = "+03:00"
+        
+        return date_str, time_str, timezone_str
+    except Exception as e:
+        logging.warning(f"Ошибка при извлечении даты и времени: {e}")
+        return None, None, None
+
+
+def get_reviews_with_photos(driver, max_reviews=100):
+    """Собирает только отзывы с фотографиями, включая имя автора, дату, оценку, текст и ссылки на фото."""
+    
+    # Прокрутка страницы немного вниз для появления кнопки "Смотреть все отзывы"
     scroll_page_incrementally(driver, 0.2)
-    time.sleep(0.42)
+    time.sleep(random.uniform(*TIMEOUT))
 
     # Переход к разделу отзывов
     try:
-        # Кнопка для открытия раздела отзывов, если требуется
+        # Кнопка для открытия раздела отзывов
         reviews_button = driver.find_element(By.XPATH, '//a[contains(@class, "comments__btn-all") and @data-see-all="true"]')
         reviews_button.click()
         time.sleep(random.uniform(*TIMEOUT))
     except Exception as e:
-        logging.warning(f"Не удалось открыть раздел отзывов для товара: {e}")
+        logging.warning(f"Не удалось открыть раздел отзывов: {e}")
         return []
     
     # Прокрутка раздела отзывов до конца для загрузки всех данных
     scroll_page_to_bottom(driver)
 
-    # Сбор данных по каждому отзыву
-    reviews_data = []
+    # Сбор данных по отзывам
+    reviews_with_photos = []
     try:
         reviews = driver.find_elements(By.XPATH, '//ul[@class="comments__list"]/li')
 
         for review in reviews:
             # Проверка, достигнуто ли максимальное количество отзывов
-            if len(reviews_data) >= max_reviews:
+            if len(reviews_with_photos) >= max_reviews:
                 break
             
-            # Инициализируем данные для каждого отзыва
-            review_data = {}
-
-            # Получение имени пользователя (обычный или премиум)
+            # Проверяем, есть ли фотографии в отзыве
             try:
+                photo_elements = review.find_elements(By.XPATH, '//ul[@class = "feedback__photos j-feedback-photos-scroll"]/li')
+                if not photo_elements:
+                    continue  # Пропускаем отзывы без фотографий
+
+                # Инициализируем данные для отзыва
+                review_data = {}
+
+                # Сохраняем ссылки на фотографии
+                photo_urls = [
+                    photo.get_attribute("src").replace("ms.webp", "fs.webp") 
+                    if "ms.webp" in photo.get_attribute("src") else photo.get_attribute("src")
+                    for photo in photo_elements
+                ]
+                review_data["Photo URLs"] = photo_urls
+
+                # Получение имени пользователя
                 try:
-                    author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text  # Обычный пользователь
-                except:
-                    author_name = review.find_element(By.XPATH, './/div/div[2]/div/div/p').text  # Премиум пользователь
-                review_data["Author Name"] = author_name
-            except Exception as e:
-                logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
-                review_data["Author Name"] = None
-            
-            # Получение даты и рейтинга
-            try:
-                date = review.find_element(By.XPATH, './/div/div[2]/div[2]/span').text
-                rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
-                rating_class = rating_element.get_attribute("class")
-                
-                # Извлечение числового значения рейтинга
-                rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
-                
-                review_data["Date"] = date
-                review_data["Rating"] = rating
-            except Exception as e:
-                logging.warning(f"Ошибка при извлечении даты или рейтинга: {e}")
-                review_data["Date"] = None
-                review_data["Rating"] = None
+                    try:
+                        author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text  # Обычный пользователь
+                    except:
+                        author_name = review.find_element(By.XPATH, './/div/div[2]/div/div/p').text  # Премиум пользователь
+                    review_data["Author Name"] = author_name
+                except Exception as e:
+                    logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
+                    review_data["Author Name"] = None
 
-            # Сбор текста отзыва
-            try:
-                full_text = ""
-                
-                # Достоинства
-                pros_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-pro"]')
-                if pros_element:
-                    pros_text = pros_element[0].text
-                    full_text += f"Достоинства: {pros_text}\n"
-                
-                # Недостатки
-                cons_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-con"]')
-                if cons_element:
-                    cons_text = cons_element[0].text
-                    full_text += f"Недостатки: {cons_text}\n"
-                
-                # Комментарии
-                comments_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item"]')
-                if comments_element:
-                    comments_text = comments_element[0].text
-                    full_text += f"Комментарии: {comments_text}"
-                
-                review_data["Text"] = full_text.strip()
-                
+                # Получение даты и рейтинга
+                try:
+                    # Извлечение элемента даты
+                    date_element = review.find_element(By.XPATH, './/div[@class="feedback__date"]')
+                    
+                    # Используем функцию для получения даты, времени и часового пояса
+                    date, time, timezone = extract_date_time(date_element)
+                    
+                    # Сохраняем в словарь отзыва
+                    review_data["Date"] = date
+                    review_data["Time"] = time
+                    review_data["Timezone"] = timezone
+                    
+                    # Извлечение рейтинга
+                    rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
+                    rating_class = rating_element.get_attribute("class")
+                    rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
+                    review_data["Rating"] = rating
+                except Exception as e:
+                    logging.warning(f"Ошибка при извлечении даты, времени или рейтинга: {e}")
+                    review_data["Date"] = None
+                    review_data["Time"] = None
+                    review_data["Timezone"] = None
+                    review_data["Rating"] = None
+
+
+                # Сбор текста отзыва
+                try:
+                    full_text = ""
+
+                    # Достоинства
+                    pros_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-pro"]')
+                    if pros_element:
+                        pros_text = pros_element[0].text
+                        full_text += f"Достоинства: {pros_text}\n"
+
+                    # Недостатки
+                    cons_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-con"]')
+                    if cons_element:
+                        cons_text = cons_element[0].text
+                        full_text += f"Недостатки: {cons_text}\n"
+
+                    # Комментарии
+                    comments_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item"]')
+                    if comments_element:
+                        comments_text = comments_element[0].text
+                        full_text += f"Комментарии: {comments_text}"
+
+                    review_data["Text"] = full_text.strip()
+
+                except Exception as e:
+                    logging.warning(f"Ошибка при сборе текста отзыва: {e}")
+                    review_data["Text"] = None
+
+                # Добавляем собранный отзыв с фото в список
+                reviews_with_photos.append(review_data)
+
             except Exception as e:
-                logging.warning(f"Ошибка при сборе текста отзыва: {e}")
-                review_data["Text"] = None
-            
-            reviews_data.append(review_data)
-    
+                logging.error(f"Ошибка при обработке отзыва: {e}")
+
     except Exception as e:
         logging.error(f"Ошибка при извлечении отзывов: {e}")
     
-    logging.info(f"Собрано {len(reviews_data)} отзывов для товара.")
-    return reviews_data
+    logging.info(f"Собрано {len(reviews_with_photos)} отзывов с фотографиями.")
+    return reviews_with_photos
 
 
+
+
+def download_image(img_url, save_directory, img_name):
+    """Скачивает изображение по заданному URL и сохраняет его в указанной директории."""
+
+    if not is_url_accessible(img_url):      # Проверка доступности img_url перед загрузкой изображения.
+        logging.error(f"Изображение недоступно: {img_url}")
+        return None  # Возврат None, если изображение недоступно
+
+    try:
+        img_data = requests.get(img_url).content  # Получение содержимого изображения
+        img_path = os.path.join(save_directory, img_name)  # Полный путь для сохранения изображения
+        with open(img_path, 'wb') as img_file:
+            img_file.write(img_data)  # Запись данных изображения в файл
+        logging.info(f"Изображение сохранено: {img_path}")
+        return img_path  # Возврат пути к сохраненному изображению
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении изображения: {e}")
+        return None  # Возврат None в случае ошибки
 
 
 
