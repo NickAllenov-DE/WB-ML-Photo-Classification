@@ -16,6 +16,7 @@ import random  # Для генерации случайных чисел
 import csv  # Для работы с CSV-файлами
 import logging  # Для ведения логов
 from tqdm import tqdm
+import pandas as pd
 
 
 TIMEOUT = (0.25, 1.75)
@@ -398,6 +399,39 @@ def get_reviews_with_photos(driver, max_reviews=100):
 
 
 
+def save_product_data_to_parquet(product_data, parquet_file):
+    """Сохраняет данные о товаре в файл products.parquet."""
+    try:
+        # Создаем DataFrame для добавления данных о товаре
+        df_product = pd.DataFrame([product_data])
+        
+        # Если файл существует, то добавляем новые данные, иначе создаем новый
+        if os.path.exists(parquet_file):
+            df_product.to_parquet(parquet_file, append=True, index=False)
+        else:
+            df_product.to_parquet(parquet_file, index=False)
+        
+        logging.info(f"Данные о товаре сохранены в {parquet_file}.")
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении данных о товаре: {e}")
+
+
+def save_review_data_to_parquet(review_data, parquet_file):
+    """Сохраняет данные о отзыве в файл reviews.parquet."""
+    try:
+        # Создаем DataFrame для добавления данных отзыва
+        df_review = pd.DataFrame([review_data])
+        
+        # Если файл существует, то добавляем новые данные, иначе создаем новый
+        if os.path.exists(parquet_file):
+            df_review.to_parquet(parquet_file, append=True, index=False)
+        else:
+            df_review.to_parquet(parquet_file, index=False)
+        
+        logging.info(f"Данные отзыва сохранены в {parquet_file}.")
+    except Exception as e:
+        logging.error(f"Ошибка при сохранении данных отзыва: {e}")
+
 
 def download_image(img_url, save_directory, img_name):
     """Скачивает изображение по заданному URL и сохраняет его в указанной директории."""
@@ -418,25 +452,53 @@ def download_image(img_url, save_directory, img_name):
         return None  # Возврат None в случае ошибки
 
 
+def download_images_from_reviews(reviews_parquet_file, save_directory):
+    """Скачивает изображения из photo_urls, хранящихся в reviews.parquet."""
+    try:
+        # Загружаем DataFrame с отзывами
+        reviews_df = pd.read_parquet(reviews_parquet_file)
+        
+        # Обрабатываем каждый отзыв
+        for index, row in reviews_df.iterrows():
+            photo_urls = row.get("photo_urls", [])
+            if photo_urls:
+                for url in photo_urls:
+                    # Генерируем имя для изображения (например, индекс отзыва)
+                    img_name = f"review_{index + 1}_{photo_urls.index(url) + 1}.jpg"
+                    # Скачиваем изображение
+                    img_path = download_image(url, save_directory, img_name)
+                    if img_path:
+                        logging.info(f"Изображение сохранено: {img_path}")
+    except Exception as e:
+        logging.error(f"Ошибка при скачивании изображений: {e}")
+
+
 
 def main():
-    """Основная функция для запуска процесса парсинга."""
+    """Основная функция для запуска процесса парсинга и сохранения данных."""
     logging.info("Запуск основного процесса.")
     driver = setup_driver()  # Настройка веб-драйвера
-    csv_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\processed\feedback_images.csv"  # Имя CSV-файла для сохранения данных
-    dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\data\raw\wb-diapers-photos"  # Директория для сохранения изображений
+    product_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\products.parquet"  # Путь для сохранения данных о товарах
+    review_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\reviews.parquet"  # Путь для сохранения данных о отзывах
+    dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\wb-diapers-photos"  # Директория для сохранения изображений
 
-    with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
-        csv_writer = csv.writer(file, delimiter=',')  # Создание CSV-писателя
-        csv_writer.writerow(['index', 'product_url', 'photo_url', 'local_path'])  # Заголовки столбцов
-        existing_images = set()  # Множество для хранения существующих изображений
+    try:
+        product_cards_list = get_product_links(driver, start_page_url)  # Получение ссылок на карточки товаров
+        for product_card in product_cards_list:
+            # Сбор данных о товаре и сохранение в products.parquet
+            product_data = get_product_data(driver, product_card)
+            save_product_data_to_parquet(product_data, product_parquet_file)
+            
+            # Сбор данных о отзывах и сохранение в reviews.parquet
+            reviews_with_photos = get_reviews_with_photos(driver)
+            for review_data in reviews_with_photos:
+                save_review_data_to_parquet(review_data, review_parquet_file)
 
-        try:
-            product_cards_list = get_product_links(driver, start_page_url)  # Получение ссылок на карточки товаров
-            for index, product_card in enumerate(product_cards_list):
-                get_feedback_images(driver, product_card, dir_to_save, csv_writer, index, existing_images)  # Скачивание изображений для каждого товара
-        except Exception as e:
-            logging.error(f"Ошибка в основном процессе: {e}")
-        finally:
-            driver.quit()  # Закрытие драйвера
-            logging.info("Процесс завершен.")
+        # Скачивание изображений, используя URLs из reviews.parquet
+        download_images_from_reviews(review_parquet_file, dir_to_save)
+
+    except Exception as e:
+        logging.error(f"Ошибка в основном процессе: {e}")
+    finally:
+        driver.quit()  # Закрытие драйвера
+        logging.info("Процесс завершен.")
