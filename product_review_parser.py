@@ -201,13 +201,13 @@ def get_popup_data(driver):
         description = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/section/p').text
 
         popup_data = {
-            "Цвет": color,
-            "Тип подгузников": product_type,
-            "Количество предметов": number_units,
-            "Весовая группа": weight_category,
-            "Страна производства": producing_country,
-            "Габариты": overall_size,
-            "Описание": description
+            "color": color,
+            "diapers_type": product_type,
+            "number_of_units": number_units,
+            "weight_category": weight_category,
+            "producing_country": producing_country,
+            "overall_size": overall_size,
+            "description": description
         }
         return popup_data
     except Exception as e:
@@ -232,10 +232,10 @@ def get_product_data(driver, product_url):
     
     # Объединяем данные
     product_data = {
-        "Артикул": product_id,
-        "Бренд": brand,
-        "Название": name,
-        "Цена": price
+        "product_article": product_id,
+        "brand": brand,
+        "name": name,
+        "price": price
     }
     
     # Если данные из всплывающего окна успешно получены, добавляем их к product_data
@@ -318,7 +318,7 @@ def get_reviews_with_photos(driver, max_reviews=100):
                     if "ms.webp" in photo.get_attribute("src") else photo.get_attribute("src")
                     for photo in photo_elements
                 ]
-                review_data["Photo URLs"] = photo_urls
+                review_data["photo_urls"] = photo_urls
 
                 # Получение имени пользователя
                 try:
@@ -326,10 +326,10 @@ def get_reviews_with_photos(driver, max_reviews=100):
                         author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text  # Обычный пользователь
                     except:
                         author_name = review.find_element(By.XPATH, './/div/div[2]/div/div/p').text  # Премиум пользователь
-                    review_data["Author Name"] = author_name
+                    review_data["author_name"] = author_name
                 except Exception as e:
                     logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
-                    review_data["Author Name"] = None
+                    review_data["author_name"] = None
 
                 # Получение даты и рейтинга
                 try:
@@ -340,22 +340,21 @@ def get_reviews_with_photos(driver, max_reviews=100):
                     date, time, timezone = extract_date_time(date_element)
                     
                     # Сохраняем в словарь отзыва
-                    review_data["Date"] = date
-                    review_data["Time"] = time
-                    review_data["Timezone"] = timezone
+                    review_data["date"] = date
+                    review_data["time"] = time
+                    review_data["timezone"] = timezone
                     
                     # Извлечение рейтинга
                     rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
                     rating_class = rating_element.get_attribute("class")
                     rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
-                    review_data["Rating"] = rating
+                    review_data["rating"] = rating
                 except Exception as e:
                     logging.warning(f"Ошибка при извлечении даты, времени или рейтинга: {e}")
-                    review_data["Date"] = None
-                    review_data["Time"] = None
-                    review_data["Timezone"] = None
-                    review_data["Rating"] = None
-
+                    review_data["date"] = None
+                    review_data["time"] = None
+                    review_data["timezone"] = None
+                    review_data["rating"] = None
 
                 # Сбор текста отзыва
                 try:
@@ -379,11 +378,11 @@ def get_reviews_with_photos(driver, max_reviews=100):
                         comments_text = comments_element[0].text
                         full_text += f"Комментарии: {comments_text}"
 
-                    review_data["Text"] = full_text.strip()
+                    review_data["review_text"] = full_text.strip()
 
                 except Exception as e:
                     logging.warning(f"Ошибка при сборе текста отзыва: {e}")
-                    review_data["Text"] = None
+                    review_data["review_text"] = None
 
                 # Добавляем собранный отзыв с фото в список
                 reviews_with_photos.append(review_data)
