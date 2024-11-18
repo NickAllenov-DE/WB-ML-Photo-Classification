@@ -502,3 +502,8 @@ def main():
     finally:
         driver.quit()  # Закрытие драйвера
         logging.info("Процесс завершен.")
+
+
+
+if __name__ == "__main__":
+    main()
