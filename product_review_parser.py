@@ -19,7 +19,7 @@ from tqdm import tqdm
 import pandas as pd
 
 
-TIMEOUT = (0.25, 1.75)
+TIMEOUT = (0.5, 2.0)
 
 # Обработка кодировки для вывода в консоль
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
@@ -34,10 +34,9 @@ logging.basicConfig(
     level=logging.INFO,  # Уровень логирования
     format='%(asctime)s - %(levelname)s - %(message)s',  # Формат сообщений
     handlers=[
-        logging.FileHandler("logs/wb_images_parser.log"),  # Логирование в файл
+        logging.FileHandler("wb_images_parser.log", encoding="utf-8"),  # Логирование в файл
         logging.StreamHandler()  # Логирование в консоль
-    ],
-    encoding="utf-8"  # Кодировка логов
+    ]
 )
 
 def setup_driver():
@@ -51,48 +50,30 @@ def setup_driver():
     return driver  # Возврат настроенного драйвера
 
 
-def is_url_accessible(url, timeout=5):
-    """Проверяет доступность указанного URL.
-    Args:       url (str): URL, который нужно проверить.
-                timeout (int): Таймаут для запроса в секундах.
-    Returns:    bool: True, если URL доступен (статусы 200, 301, 302), иначе False.
-    """
-    try:
-        response = requests.head(url, timeout=timeout)  # Выполнение HEAD-запроса с заданным таймаутом
-        return response.status_code in (200, 301, 302)  # Проверка на доступные статусы
-    except requests.RequestException as e:
-        logging.error(f"Ошибка доступа к URL: {url}, ошибка: {e}")  # Логирование ошибки
-        return False  # Возвращает False в случае ошибки
-
-
-def scroll_page_to_bottom(driver):
-    """Прокручивает страницу до самого низа."""
-    logging.info("Начинаем прокрутку страницы до конца.")
-    last_height = driver.execute_script("return document.body.scrollHeight")  # Получаем высоту страницы
+def scroll_page_to_bottom(driver, scroll_percentage=0.2):
+    """Прокручивает страницу на заданный процент до тех пор, пока высота страницы изменяется, затем докручивает до конца."""
+    logging.info("Начинаем прокрутку страницы.")
+    
+    last_height = driver.execute_script("return document.body.scrollHeight")  # Получаем текущую высоту страницы
+    scroll_position = 0  # Начальная позиция прокрутки
     
     while True:
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Прокрутка вниз
+        # Прокручиваем на заданный процент от текущей высоты
+        driver.execute_script(f"window.scrollTo(0, {scroll_position + scroll_percentage * last_height});")
         time.sleep(random.uniform(*TIMEOUT))  # Ожидание перед следующей прокруткой
-        new_height = driver.execute_script("return document.body.scrollHeight")  # Получаем новую высоту
-        if new_height == last_height:  # Если высота не изменилась, значит, достигли конца
+
+        # Получаем новую высоту страницы
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        
+        # Если высота страницы не изменилась, прокручиваем до конца
+        if new_height == last_height:
+            logging.info(f"Достигнут конец страницы ({scroll_percentage*100}%). Теперь прокручиваем до самого конца.")
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Прокручиваем до конца
             logging.info("Достигнут конец страницы.")
             break
+        
         last_height = new_height  # Обновляем высоту для следующей итерации
-
-
-def scroll_popup_to_bottom(driver, popup_element, scroll_pause_time=1):
-    """Прокручивает всплывающее окно до самого низа."""
-    logging.info("Начинаем прокрутку всплывающего окна.")
-    last_height = driver.execute_script("return arguments[0].scrollHeight", popup_element)  # Получаем высоту всплывающего окна
-    
-    while True:
-        driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", popup_element)  # Прокрутка вниз
-        time.sleep(scroll_pause_time)  # Ожидание перед следующей прокруткой
-        new_height = driver.execute_script("return arguments[0].scrollHeight", popup_element)  # Получаем новую высоту
-        if new_height == last_height:  # Если высота не изменилась, значит, достигли конца
-            logging.info("Достигнут конец всплывающего окна.")
-            break
-        last_height = new_height  # Обновляем высоту для следующей итерации
+        scroll_position += scroll_percentage * last_height  # Обновляем позицию прокрутки
 
 
 def scroll_page_incrementally(driver, increment: float):
@@ -105,6 +86,21 @@ def scroll_page_incrementally(driver, increment: float):
     while new_scroll_position < scroll_increment:
         driver.execute_script(f"window.scrollTo(0, {new_scroll_position});")  # Прокручиваем на заданное количество пикселей
         new_scroll_position += 2  # Увеличиваем позицию прокрутки на 2 пикселя
+
+
+def scroll_popup_to_bottom(driver, popup_element):
+    """Прокручивает всплывающее окно до самого низа."""
+    logging.info("Начинаем прокрутку всплывающего окна.")
+    last_height = driver.execute_script("return arguments[0].scrollHeight", popup_element)  # Получаем высоту всплывающего окна
+    
+    while True:
+        driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", popup_element)  # Прокрутка вниз
+        time.sleep(random.uniform(*TIMEOUT))  # Ожидание перед следующей прокруткой
+        new_height = driver.execute_script("return arguments[0].scrollHeight", popup_element)  # Получаем новую высоту
+        if new_height == last_height:  # Если высота не изменилась, значит, достигли конца
+            logging.info("Достигнут конец всплывающего окна.")
+            break
+        last_height = new_height  # Обновляем высоту для следующей итерации
 
 
 def get_next_page_button(driver):
@@ -126,39 +122,42 @@ def get_product_links(driver, start_page):
     while True:
         current_page_url = f"{start_page}?page={page_number}"
         
-        # Проверка доступности текущей страницы
-        if not is_url_accessible(current_page_url):
-            logging.error(f"Страница недоступна: {current_page_url}")
-            break  # Выход из цикла, если страница недоступна
-
-        logging.info(f"Собираем ссылки на карточки товаров с страницы {page_number}.")
+        logging.info(f"Собираем ссылки со страницы {page_number} ({current_page_url}).")
         driver.get(current_page_url)  # Переход на страницу
         time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки страницы
         scroll_page_to_bottom(driver)  # Прокрутка страницы до конца
-        
-        products = driver.find_elements(By.XPATH, '//article/div/a')  # Поиск элементов с товарами
-        for product in products:
-            link = product.get_attribute("href")  # Получение ссылки на товар
-            if link:
-                product_links.append(link)  # Добавление ссылки в список
 
-        next_button = get_next_page_button(driver)  # Получение кнопки "Следующая страница"
+        # Поиск элементов с товарами
+        products = driver.find_elements(By.XPATH, '//article/div/a')
+        if not products:
+            logging.warning(f"На странице {page_number} не найдено товаров. Прерывание.")
+            break
+
+        # Получение ссылок
+        page_links = [product.get_attribute("href") for product in products if product.get_attribute("href")]
+        logging.info(f"На странице {page_number} найдено {len(page_links)} ссылок.")
+
+        product_links.extend(page_links)  # Добавление ссылок в общий список
+
+        # Проверяем наличие кнопки "Следующая страница"
+        next_button = get_next_page_button(driver)
         if next_button:
+            logging.info("Переход на следующую страницу.")
             next_button.click()  # Переход на следующую страницу
             time.sleep(random.uniform(*TIMEOUT))  # Ожидание загрузки следующей страницы
             page_number += 1  # Увеличение номера страницы
         else:
-            logging.info("Последняя страница достигнута.")
+            logging.info("Последняя страница достигнута. Завершаем сбор ссылок.")
             break
 
-    logging.info(f"Всего собрано {len(product_links)} ссылок на товары.")
+    logging.info(f"Сбор завершён. Всего собрано {len(product_links)} ссылок.")
     return product_links  # Возврат списка ссылок на товары
 
 
 def get_price(driver):
     """Извлекает и форматирует цену товара."""
     try:
-        price_element = driver.find_element(By.XPATH, '//*[@id="b88bf175-c0d2-fec2-0220-3447970e41fa"]/div[3]/div[2]/div/div/div/div/p/span/ins')
+        price_element = driver.find_element(By.XPATH, '//*[@class="product-page__price-block product-page__price-block--common hide-mobile"]/div/div/div/div/p/span/ins')
         price_text = price_element.text  # Например, "1 234 ₽"
         price = int(price_text.replace("\u00A0", "").replace("₽", "").strip())  # Убираем пробелы и знак рубля
         return price
@@ -178,7 +177,7 @@ def get_full_description_button(driver):
         logging.error(f"Не удалось найти или нажать кнопку 'Все характеристики и описание': {e}")
 
 
-def get_popup_data(driver):
+def get_description_data(driver):
     """Извлекает данные из всплывающего окна после его открытия."""
     try:
         # Подождем загрузку окна
@@ -229,7 +228,7 @@ def get_product_data(driver, product_url):
 
     # Открываем всплывающее окно и извлекаем данные
     get_full_description_button(driver)
-    popup_data = get_popup_data(driver)
+    popup_data = get_description_data(driver)
     
     # Объединяем данные
     product_data = {
@@ -274,16 +273,59 @@ def extract_date_time(date_element):
         return None, None, None
 
 
-def get_reviews_with_photos(driver, max_reviews=100):
-    """Собирает только отзывы с фотографиями, включая имя автора, дату, оценку, текст и ссылки на фото."""
-    
-    # Прокрутка страницы немного вниз для появления кнопки "Смотреть все отзывы"
-    scroll_page_incrementally(driver, 0.2)
-    time.sleep(random.uniform(*TIMEOUT))
+def get_author_name(review):
+    try:
+        return review.find_element(By.XPATH, './/div/div[2]/div/p').text
+    except Exception as e:
+        logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
+        return None
 
+def get_review_date_and_rating(review):
+    try:
+        date_element = review.find_element(By.XPATH, './/div[@class="feedback__date"]')
+        date, time, timezone = extract_date_time(date_element)
+
+        rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
+        rating_class = rating_element.get_attribute("class")
+        rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
+
+        return date, time, timezone, rating
+    except Exception as e:
+        logging.warning(f"Ошибка при извлечении данных о дате и рейтинге: {e}")
+        return None, None, None, None
+
+def get_review_text(review):
+    try:
+        full_text = ""
+        pros_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-pro"]')
+        if pros_element:
+            full_text += f"Достоинства: {pros_element[0].text}\n"
+
+        cons_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-con"]')
+        if cons_element:
+            full_text += f"Недостатки: {cons_element[0].text}\n"
+
+        comments_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item"]')
+        if comments_element:
+            full_text += f"Комментарии: {comments_element[0].text}"
+        
+        return full_text.strip()
+    except Exception as e:
+        logging.warning(f"Ошибка при сборе текста отзыва: {e}")
+        return None
+
+
+def get_reviews_with_photos(driver, max_reviews=100):
+    """Собирает только отзывы с фотографиями."""
+    try:
+        # Прокрутка страницы
+        scroll_page_incrementally(driver, 0.2)
+        time.sleep(random.uniform(*TIMEOUT))
+    except Exception as e:
+        logging.error(f"Ошибка при прокрутке страницы: {e}")
+    
     # Переход к разделу отзывов
     try:
-        # Кнопка для открытия раздела отзывов
         reviews_button = driver.find_element(By.XPATH, '//a[contains(@class, "comments__btn-all") and @data-see-all="true"]')
         reviews_button.click()
         time.sleep(random.uniform(*TIMEOUT))
@@ -291,29 +333,24 @@ def get_reviews_with_photos(driver, max_reviews=100):
         logging.warning(f"Не удалось открыть раздел отзывов: {e}")
         return []
     
-    # Прокрутка раздела отзывов до конца для загрузки всех данных
-    scroll_page_to_bottom(driver)
-
-    # Сбор данных по отзывам
     reviews_with_photos = []
     try:
         reviews = driver.find_elements(By.XPATH, '//ul[@class="comments__list"]/li')
 
-        for review in reviews:
-            # Проверка, достигнуто ли максимальное количество отзывов
+        for index, review in enumerate(reviews):
             if len(reviews_with_photos) >= max_reviews:
                 break
-            
-            # Проверяем, есть ли фотографии в отзыве
+
+            # Логируем начало обработки отзыва
+            logging.info(f"Обработка отзыва {index + 1} из {len(reviews)}")
+
             try:
-                photo_elements = review.find_elements(By.XPATH, '//ul[@class = "feedback__photos j-feedback-photos-scroll"]/li')
+                photo_elements = review.find_elements(By.XPATH, './/ul[@class="feedback__photos j-feedback-photos-scroll"]/li')
                 if not photo_elements:
-                    continue  # Пропускаем отзывы без фотографий
+                    continue
 
-                # Инициализируем данные для отзыва
+                # Собираем данные отзыва
                 review_data = {}
-
-                # Сохраняем ссылки на фотографии
                 photo_urls = [
                     photo.get_attribute("src").replace("ms.webp", "fs.webp") 
                     if "ms.webp" in photo.get_attribute("src") else photo.get_attribute("src")
@@ -321,82 +358,62 @@ def get_reviews_with_photos(driver, max_reviews=100):
                 ]
                 review_data["photo_urls"] = photo_urls
 
-                # Получение имени пользователя
+                # Получение имени автора
                 try:
-                    try:
-                        author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text  # Обычный пользователь
-                    except:
-                        author_name = review.find_element(By.XPATH, './/div/div[2]/div/div/p').text  # Премиум пользователь
+                    author_name = review.find_element(By.XPATH, './/div/div[2]/div/p').text
                     review_data["author_name"] = author_name
                 except Exception as e:
-                    logging.warning(f"Ошибка при извлечении имени пользователя: {e}")
+                    logging.warning(f"Ошибка при извлечении имени пользователя для отзыва {index + 1}: {e}")
                     review_data["author_name"] = None
 
-                # Получение даты и рейтинга
+                # Дата и рейтинг
                 try:
-                    # Извлечение элемента даты
                     date_element = review.find_element(By.XPATH, './/div[@class="feedback__date"]')
-                    
-                    # Используем функцию для получения даты, времени и часового пояса
                     date, time, timezone = extract_date_time(date_element)
-                    
-                    # Сохраняем в словарь отзыва
                     review_data["date"] = date
                     review_data["time"] = time
                     review_data["timezone"] = timezone
                     
-                    # Извлечение рейтинга
                     rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')
                     rating_class = rating_element.get_attribute("class")
                     rating = int(rating_class.split("star")[-1]) if "star" in rating_class else None
                     review_data["rating"] = rating
                 except Exception as e:
-                    logging.warning(f"Ошибка при извлечении даты, времени или рейтинга: {e}")
+                    logging.warning(f"Ошибка при извлечении даты, времени или рейтинга отзыва {index + 1}: {e}")
                     review_data["date"] = None
                     review_data["time"] = None
                     review_data["timezone"] = None
                     review_data["rating"] = None
 
-                # Сбор текста отзыва
+                # Текст отзыва
                 try:
                     full_text = ""
-
-                    # Достоинства
                     pros_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-pro"]')
                     if pros_element:
-                        pros_text = pros_element[0].text
-                        full_text += f"Достоинства: {pros_text}\n"
+                        full_text += f"Достоинства: {pros_element[0].text}\n"
 
-                    # Недостатки
                     cons_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item feedback__text--item-con"]')
                     if cons_element:
-                        cons_text = cons_element[0].text
-                        full_text += f"Недостатки: {cons_text}\n"
+                        full_text += f"Недостатки: {cons_element[0].text}\n"
 
-                    # Комментарии
                     comments_element = review.find_elements(By.XPATH, './/p/span[@class="feedback__text--item"]')
                     if comments_element:
-                        comments_text = comments_element[0].text
-                        full_text += f"Комментарии: {comments_text}"
-
+                        full_text += f"Комментарии: {comments_element[0].text}"
+                    
                     review_data["review_text"] = full_text.strip()
-
                 except Exception as e:
-                    logging.warning(f"Ошибка при сборе текста отзыва: {e}")
+                    logging.warning(f"Ошибка при сборе текста отзыва {index + 1}: {e}")
                     review_data["review_text"] = None
 
-                # Добавляем собранный отзыв с фото в список
                 reviews_with_photos.append(review_data)
-
             except Exception as e:
-                logging.error(f"Ошибка при обработке отзыва: {e}")
+                logging.error(f"Ошибка при обработке отзыва {index + 1}: {e}")
 
     except Exception as e:
         logging.error(f"Ошибка при извлечении отзывов: {e}")
     
     logging.info(f"Собрано {len(reviews_with_photos)} отзывов с фотографиями.")
     return reviews_with_photos
-
 
 
 def save_product_data_to_parquet(product_data, parquet_file):
@@ -433,27 +450,8 @@ def save_review_data_to_parquet(review_data, parquet_file):
         logging.error(f"Ошибка при сохранении данных отзыва: {e}")
 
 
-def download_image(img_url, save_directory, img_name):
-    """Скачивает изображение по заданному URL и сохраняет его в указанной директории."""
-
-    if not is_url_accessible(img_url):      # Проверка доступности img_url перед загрузкой изображения.
-        logging.error(f"Изображение недоступно: {img_url}")
-        return None  # Возврат None, если изображение недоступно
-
-    try:
-        img_data = requests.get(img_url).content  # Получение содержимого изображения
-        img_path = os.path.join(save_directory, img_name)  # Полный путь для сохранения изображения
-        with open(img_path, 'wb') as img_file:
-            img_file.write(img_data)  # Запись данных изображения в файл
-        logging.info(f"Изображение сохранено: {img_path}")
-        return img_path  # Возврат пути к сохраненному изображению
-    except Exception as e:
-        logging.error(f"Ошибка при сохранении изображения: {e}")
-        return None  # Возврат None в случае ошибки
-
-
 def download_images_from_reviews(reviews_parquet_file, save_directory):
-    """Скачивает изображения из photo_urls, хранящихся в reviews.parquet."""
+    """Скачивает изображения из photo_urls, хранящихся в reviews.parquet, и сохраняет их в указанной директории."""
     try:
         # Загружаем DataFrame с отзывами
         reviews_df = pd.read_parquet(reviews_parquet_file)
@@ -463,12 +461,18 @@ def download_images_from_reviews(reviews_parquet_file, save_directory):
             photo_urls = row.get("photo_urls", [])
             if photo_urls:
                 for url in photo_urls:
-                    # Генерируем имя для изображения (например, индекс отзыва)
-                    img_name = f"review_{index + 1}_{photo_urls.index(url) + 1}.jpg"
-                    # Скачиваем изображение
-                    img_path = download_image(url, save_directory, img_name)
-                    if img_path:
+                    try:
+                        img_data = requests.get(url).content  # Получаем содержимое изображения
+                        img_name = f"review_{index + 1}_{photo_urls.index(url) + 1}.jpg"  # Генерация имени
+                        img_path = os.path.join(save_directory, img_name)  # Путь для сохранения изображения
+                        
+                        # Записываем данные изображения в файл
+                        with open(img_path, 'wb') as img_file:
+                            img_file.write(img_data)
+                        
                         logging.info(f"Изображение сохранено: {img_path}")
+                    except Exception as e:
+                        logging.error(f"Ошибка при сохранении изображения {url}: {e}")
     except Exception as e:
         logging.error(f"Ошибка при скачивании изображений: {e}")
 
@@ -483,26 +487,40 @@ def main():
     dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\wb-diapers-photos"  # Директория для сохранения изображений
 
     try:
-        product_cards_list = get_product_links(driver, start_page_url)  # Получение ссылок на карточки товаров
+        # Получение ссылок на карточки товаров
+        logging.info("Начало сбора ссылок на карточки товаров.")
+        product_cards_list = get_product_links(driver, start_page_url)
+        logging.info(f"Собрано {len(product_cards_list)} ссылок на карточки товаров.")
+        
+        # Проход по каждой карточке товара
         for product_card in product_cards_list:
-            # Сбор данных о товаре и сохранение в products.parquet
-            product_data = get_product_data(driver, product_card)
-            save_product_data_to_parquet(product_data, product_parquet_file)
-            
-            # Сбор данных о отзывах и сохранение в reviews.parquet
-            reviews_with_photos = get_reviews_with_photos(driver)
-            for review_data in reviews_with_photos:
-                save_review_data_to_parquet(review_data, review_parquet_file)
-
-        # Скачивание изображений, используя URLs из reviews.parquet
-        download_images_from_reviews(review_parquet_file, dir_to_save)
-
+            try:
+                # Сбор данных о товаре
+                product_data = get_product_data(driver, product_card)
+                save_product_data_to_parquet(product_data, product_parquet_file)
+                logging.info(f"Данные о товаре сохранены: {product_data['name']}")
+                
+                # Сбор данных об отзывах
+                reviews_with_photos = get_reviews_with_photos(driver)
+                save_review_data_to_parquet(reviews_with_photos, review_parquet_file)
+                logging.info(f"Данные о {len(reviews_with_photos)} отзывах сохранены.")
+            except Exception as e:
+                logging.error(f"Ошибка обработки карточки товара {product_card}: {e}")
+        
+        # Скачивание изображений из сохраненного файла отзывов
+        logging.info("Начало скачивания изображений из отзывов.")
+        if os.path.exists(review_parquet_file):
+            download_images_from_reviews(review_parquet_file, dir_to_save)
+            logging.info(f"Изображения успешно скачаны в директорию: {dir_to_save}")
+        else:
+            logging.warning(f"Файл отзывов {review_parquet_file} не найден. Пропуск скачивания изображений.")
+    
     except Exception as e:
         logging.error(f"Ошибка в основном процессе: {e}")
     finally:
-        driver.quit()  # Закрытие драйвера
+        # Закрытие драйвера
+        driver.quit()
         logging.info("Процесс завершен.")
-
 
 
 if __name__ == "__main__":
