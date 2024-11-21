@@ -106,57 +106,74 @@ def get_description_data(driver):
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[1]/div')))
         logging.info("Всплывающее окно успешно загружено.")
 
+        # Находим родительский элемент
+        char_desc_elem = driver.find_element(By.XPATH, '/html/body/div[1]/div[@class="popup__content"]')
+
         popup_data = {}
-        
+
         # Извлечение данных по каждому элементу
         try:
-            color = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[1]/tbody/tr/td/span').text
+            color = char_desc_elem.find_element(By.XPATH, './/table[1]//td/span').text
             popup_data["color"] = color
             logging.info(f"Цвет товара: {color}")
         except Exception as e:
             logging.warning(f"Не удалось извлечь цвет товара: {e}")
         
         try:
-            product_type = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[1]/td/span').text
-            popup_data["diapers_type"] = product_type
-            logging.info(f"Тип товара: {product_type}")
-        except Exception as e:
-            logging.warning(f"Не удалось извлечь тип товара: {e}")
-        
-        try:
-            number_units = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[2]/tbody/tr/td/span').text
+            number_units = char_desc_elem.find_element(By.XPATH, './/table[2]//td/span').text
             popup_data["number_of_units"] = number_units
             logging.info(f"Количество единиц в упаковке: {number_units}")
         except Exception as e:
             logging.warning(f"Не удалось извлечь количество единиц: {e}")
-        
+
         try:
-            weight_category = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[2]/td/span').text
+            product_type = char_desc_elem.find_element(By.XPATH, './/table[3]//tbody/tr[1]/td/span').text
+            popup_data["diapers_type"] = product_type
+            logging.info(f"Тип товара: {product_type}")
+        except Exception as e:
+            logging.warning(f"Не удалось извлечь тип товара: {e}")
+
+        try:
+            weight_category = char_desc_elem.find_element(By.XPATH, './/table[3]//tbody/tr[2]/td/span').text
             popup_data["weight_category"] = weight_category
             logging.info(f"Весовая категория: {weight_category}")
         except Exception as e:
             logging.warning(f"Не удалось извлечь весовую категорию: {e}")
-        
+
         try:
-            producing_country = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[3]/tbody/tr[4]/td/span').text
+            shipping_weight = char_desc_elem.find_element(By.XPATH, './/table[3]//tbody/tr[3]/td/span').text
+            popup_data["shipping_weight"] = shipping_weight
+            logging.info(f"Вестовара с упаковкой: {shipping_weight}")
+        except Exception as e:
+            logging.warning(f"Не удалось извлечь вестовара с упаковкой: {e}")
+
+        try:
+            producing_country = char_desc_elem.find_element(By.XPATH, './/table[3]//tbody/tr[4]/td/span').text
             popup_data["producing_country"] = producing_country
             logging.info(f"Страна производства: {producing_country}")
         except Exception as e:
             logging.warning(f"Не удалось извлечь страну производства: {e}")
 
+        try:
+            equipment = char_desc_elem.find_element(By.XPATH, './/table[3]//tbody/tr[5]/td/span').text
+            popup_data["equipment"] = equipment
+            logging.info(f"Комплектация: {equipment}")
+        except Exception as e:
+            logging.warning(f"Не удалось извлечь комплектацию: {e}")
+
         # Извлечение размеров упаковки
         try:
-            length = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[1]/td/span').text.strip().replace(' см', '')
-            height = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[2]/td/span').text.strip().replace(' см', '')
-            width = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/div[2]/table[4]/tbody/tr[3]/td/span').text.strip().replace(' см', '')
+            length = char_desc_elem.find_element(By.XPATH, './/table[4]//tbody/tr[1]/td/span').text.strip().replace(' см', '')
+            height = char_desc_elem.find_element(By.XPATH, './/table[4]//tbody/tr[2]/td/span').text.strip().replace(' см', '')
+            width = char_desc_elem.find_element(By.XPATH, './/table[4]//tbody/tr[3]/td/span').text.strip().replace(' см', '')
             overall_size = f"{length}x{height}x{width}"
             popup_data["overall_size"] = overall_size
-            logging.info(f"Габариты товара (ДхВхШ): {overall_size}")
+            logging.info(f"Габариты товара, см (ДхВхШ): {overall_size}")
         except Exception as e:
             logging.warning(f"Не удалось извлечь размеры упаковки: {e}")
 
         try:
-            description = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[1]/section/p').text
+            description = char_desc_elem.find_element(By.XPATH, './/section/p').text
             popup_data["description"] = description
             logging.info(f"Описание товара: {description}")
         except Exception as e:
@@ -167,6 +184,7 @@ def get_description_data(driver):
     except Exception as e:
         logging.error(f"Ошибка при извлечении данных из всплывающего окна: {e}")
         return None
+
 
 
 def get_product_data(driver, product_url):
