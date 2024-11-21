@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import random  # Для генерации случайных чисел
 import logging  # Для ведения логов
 import pandas as pd
+import time
 
 from utils import scroll_page_incrementally
 TIMEOUT = (0.5, 2.0)
@@ -18,6 +19,7 @@ def extract_date_time(date_element):
     Args: date_element: WebElement содержащий атрибут 'content' с датой и временем.
     Returns: tuple: (строка с датой, строка с временем в формате HH:MM:SS, строка с часовым поясом)
     """
+    
     try:
         # Извлекаем ISO-строку
         date_time_iso = date_element.get_attribute("content").rstrip("Z")
@@ -87,7 +89,7 @@ def get_reviews_with_photos(driver, max_reviews=100):
     """Собирает только отзывы с фотографиями."""
     try:
         # Прокрутка страницы
-        scroll_page_incrementally(driver, 0.2)
+        scroll_page_incrementally(driver, 0.3)
         time.sleep(random.uniform(*TIMEOUT))
     except Exception as e:
         logging.error(f"Ошибка при прокрутке страницы: {e}")
@@ -137,9 +139,9 @@ def get_reviews_with_photos(driver, max_reviews=100):
                 # Дата и рейтинг
                 try:
                     date_element = review.find_element(By.XPATH, './/div[@class="feedback__date"]')
-                    date, time, timezone = extract_date_time(date_element)
+                    date, review_time, timezone = extract_date_time(date_element)
                     review_data["date"] = date
-                    review_data["time"] = time
+                    review_data["time"] = review_time
                     review_data["timezone"] = timezone
                     
                     rating_element = review.find_element(By.XPATH, './/span[contains(@class, "stars-line")]')

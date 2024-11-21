@@ -6,30 +6,49 @@ import random  # Для генерации случайных чисел
 TIMEOUT = (0.5, 2.0)
 
 
-def scroll_page_to_bottom(driver, scroll_percentage=0.2):
-    """Прокручивает страницу на заданный процент до тех пор, пока высота страницы изменяется, затем докручивает до конца."""
-    logging.info("Начинаем прокрутку страницы.")
+def scroll_page_to_bottom(driver, increment=0.1, step=300, max_retries=5):
+    """
+    Плавно прокручивает страницу, дожидаясь полной загрузки всех элементов.
     
-    last_height = driver.execute_script("return document.body.scrollHeight")  # Получаем текущую высоту страницы
-    scroll_position = 0  # Начальная позиция прокрутки
-    
-    while True:
-        # Прокручиваем на заданный процент от текущей высоты
-        driver.execute_script(f"window.scrollTo(0, {scroll_position + scroll_percentage * last_height});")
-        time.sleep(random.uniform(*TIMEOUT))  # Ожидание перед следующей прокруткой
+    :param driver: WebDriver для взаимодействия с браузером.
+    :param increment: Доля высоты страницы, на которую нужно прокрутить за один цикл.
+    :param step: Шаг прокрутки в пикселях, чтобы обеспечить плавное движение.
+    :param max_retries: Максимальное количество попыток для загрузки всех элементов.
+    """
+    logging.info("Начинаем плавную прокрутку страницы.")
 
-        # Получаем новую высоту страницы
+    last_height = driver.execute_script("return document.body.scrollHeight")  # Текущая высота страницы
+    retries = 0  # Счётчик попыток
+    while retries < max_retries:
+        current_scroll_position = 0
+        while current_scroll_position < last_height:
+            # Прокручиваем страницу на шаг `step`
+            driver.execute_script(f"window.scrollTo(0, {current_scroll_position});")
+            current_scroll_position += step
+            time.sleep(0.01)  # Короткая пауза для плавности
+
+        time.sleep(random.uniform(*TIMEOUT))  # Делаем паузу, чтобы подгрузились элементы
+
+        # Проверяем, изменилась ли высота страницы
         new_height = driver.execute_script("return document.body.scrollHeight")
-        
-        # Если высота страницы не изменилась, прокручиваем до конца
         if new_height == last_height:
-            logging.info(f"Достигнут конец страницы ({scroll_percentage*100}%). Теперь прокручиваем до самого конца.")
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")  # Прокручиваем до конца
-            logging.info("Достигнут конец страницы.")
-            break
-        
-        last_height = new_height  # Обновляем высоту для следующей итерации
-        scroll_position += scroll_percentage * last_height  # Обновляем позицию прокрутки
+            logging.info("Высота страницы не изменилась. Проверяем количество загруженных элементов.")
+            products = driver.find_elements(By.XPATH, '//article/div/a')
+            if len(products) >= 100 or retries >= max_retries:
+                logging.info(f"Достигнуто {len(products)} элементов. Прокрутка завершена.")
+                break
+            else:
+                logging.warning(f"Элементов загружено {len(products)}, требуется повторная прокрутка.")
+                retries += 1
+                continue  # Повторяем цикл
+        else:
+            last_height = new_height
+            retries = 0  # Сброс счётчика при изменении высоты страницы
+
+    # Прокручиваем до самого конца
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    logging.info("Плавная прокрутка страницы завершена.")
+
 
 
 def scroll_page_incrementally(driver, increment: float):

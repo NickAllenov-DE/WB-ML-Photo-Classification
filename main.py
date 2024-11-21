@@ -21,9 +21,9 @@ import pandas as pd
 
 from utils import scroll_page_to_bottom, scroll_page_incrementally, scroll_popup_to_bottom,\
     get_next_page_button
-from product_data import get_product_links, get_price, get_full_description_button,\
+from products import get_product_links, get_price, get_full_description_button,\
     get_description_data, get_product_data, save_product_data_to_parquet
-from product_reviews import extract_date_time, get_author_name, get_review_date_and_rating,\
+from reviews import extract_date_time, get_author_name, get_review_date_and_rating,\
     get_review_text, get_reviews_with_photos, save_review_data_to_parquet, download_images_from_reviews
 
 TIMEOUT = (0.5, 2.0)
@@ -44,7 +44,7 @@ def setup_logging(log_file: str = "wb_parser.log") -> None:
         format="%(asctime)s - %(levelname)s - %(message)s", # Формат сообщений
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-        logging.FileHandler("wb_parser.log", encoding="utf-8"),  # Логирование в файл
+        logging.FileHandler(log_file, encoding="utf-8"),  # Логирование в файл
         logging.StreamHandler()  # Логирование в консоль
         ]
     )
@@ -67,8 +67,8 @@ def main():
     setup_logging()
     logging.info("Запуск основного процесса.")
     driver = setup_driver()  # Настройка веб-драйвера
-    product_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\products.parquet"  # Путь для сохранения данных о товарах
-    review_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\reviews.parquet"  # Путь для сохранения данных о отзывах
+    product_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\products_data.parquet"  # Путь для сохранения данных о товарах
+    review_parquet_file = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\reviews_data.parquet"  # Путь для сохранения данных о отзывах
     dir_to_save = r"d:\Projects\CurrentProjects\WB-ML-Photo-Classification\wb-diapers-photos"  # Директория для сохранения изображений
 
     try:
